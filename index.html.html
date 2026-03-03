@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asistencia AMPF — Llenado Automático</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0e0e0e;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --accent: #00e5a0;
+    --accent2: #005c40;
+    --text: #e8e8e8;
+    --muted: #666;
+    --error: #ff4d4d;
+    --warn: #f5a623;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 80px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+  }
+
+  .tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: #fff;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    margin-top: 8px;
+    font-size: 14px;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .main {
+    width: 100%;
+    max-width: 720px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+  }
+
+  .card-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+
+  .drop-zone {
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0, 229, 160, 0.04);
+  }
+
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .drop-icon {
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+
+  .drop-text {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .drop-text strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .file-selected {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,229,160,0.07);
+    border: 1px solid var(--accent2);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  .file-selected .remove {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.15s;
+  }
+  .file-selected .remove:hover { color: var(--error); }
+
+  .btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--accent);
+    color: #000;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #00ffc0;
+    transform: translateY(-1px);
+  }
+
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .log-box {
+    background: #0a0a0a;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    max-height: 240px;
+    overflow-y: auto;
+    display: none;
+  }
+
+  .log-box.visible { display: block; }
+
+  .log-line { color: var(--muted); }
+  .log-line.ok { color: var(--accent); }
+  .log-line.warn { color: var(--warn); }
+  .log-line.err { color: var(--error); }
+  .log-line.head { color: #fff; font-weight: 600; }
+
+  .result-card {
+    display: none;
+    background: rgba(0,229,160,0.05);
+    border: 1px solid var(--accent2);
+    border-radius: 4px;
+    padding: 20px 24px;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .result-card.visible { display: flex; }
+
+  .result-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .result-stat .label { color: var(--muted); }
+  .result-stat .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .btn-download {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border: 1px solid var(--accent2);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 4px;
+  }
+
+  .btn-download:hover {
+    background: rgba(0,229,160,0.08);
+    border-color: var(--accent);
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid #000;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    margin-top: 60px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #333;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tag">FGR · AMPF · Michoacán</div>
+  <h1>Asistencia <span>Auto</span>Fill</h1>
+  <p class="subtitle">Cruza el reporte de accesos con la plantilla de asistencia y llena la segunda quincena automáticamente.</p>
+</header>
+
+<div class="main">
+
+  <!-- FILE 1 -->
+  <div class="card">
+    <div class="card-label">Archivo 01</div>
+    <div class="card-title">Plantilla de Asistencia</div>
+    <div class="card-desc">El archivo <strong>ASISTENCIA_AMPF.xlsx</strong> con las hojas por área (PROCESOS, NUCLEO-A, etc.) que quieres llenar.</div>
+    <div id="drop1" class="drop-zone">
+      <input type="file" id="file1" accept=".xlsx,.xls">
+      <div class="drop-icon">📋</div>
+      <div class="drop-text"><strong>Elige o arrastra</strong> el archivo aquí</div>
+    </div>
+    <div id="name1" class="file-selected" style="display:none;">
+      <span>📄</span><span id="name1-text"></span>
+      <button class="remove" onclick="clearFile(1)">×</button>
+    </div>
+  </div>
+
+  <!-- FILE 2 -->
+  <div class="card">
+    <div class="card-label">Archivo 02</div>
+    <div class="card-title">Reporte de Accesos</div>
+    <div class="card-desc">El archivo <strong>ReportUnidadFechas.xlsx</strong> con las entradas y salidas reales exportadas del sistema de accesos.</div>
+    <div id="drop2" class="drop-zone">
+      <input type="file" id="file2" accept=".xlsx,.xls">
+      <div class="drop-icon">🗂️</div>
+      <div class="drop-text"><strong>Elige o arrastra</strong> el archivo aquí</div>
+    </div>
+    <div id="name2" class="file-selected" style="display:none;">
+      <span>📄</span><span id="name2-text"></span>
+      <button class="remove" onclick="clearFile(2)">×</button>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <button class="btn" id="runBtn" disabled onclick="run()">
+    Procesar archivos
+  </button>
+
+  <!-- LOG -->
+  <div class="log-box" id="logBox"></div>
+
+  <!-- RESULT -->
+  <div class="result-card" id="resultCard">
+    <div class="result-stat">
+      <span class="label">Celdas llenadas</span>
+      <span class="value" id="statFilled">0</span>
+    </div>
+    <div class="result-stat">
+      <span class="label">Trabajadores procesados</span>
+      <span class="value" id="statWorkers">0</span>
+    </div>
+    <div class="result-stat">
+      <span class="label">No encontrados en reporte</span>
+      <span class="value" id="statMissing" style="color:var(--warn)">0</span>
+    </div>
+    <button class="btn-download" id="dlBtn">⬇ Descargar Asistencia Llenada</button>
+  </div>
+
+</div>
+
+<footer>Procesamiento local · Ningún archivo se sube a servidores</footer>
+
+<script>
+let wb1 = null, wb2 = null;
+let file1Name = '', file2Name = '';
+let resultWb = null;
+
+// Drag & drop
+['drop1','drop2'].forEach((id, idx) => {
+  const zone = document.getElementById(id);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(idx+1, f);
+  });
+});
+
+document.getElementById('file1').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(1, e.target.files[0]);
+});
+document.getElementById('file2').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(2, e.target.files[0]);
+});
+
+function handleFile(num, file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, { type: 'array', cellText: false, cellDates: true });
+    if (num === 1) { wb1 = wb; file1Name = file.name; }
+    else           { wb2 = wb; file2Name = file.name; }
+    showFileTag(num, file.name);
+    checkReady();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showFileTag(num, name) {
+  document.getElementById(`drop${num}`).style.display = 'none';
+  const tag = document.getElementById(`name${num}`);
+  document.getElementById(`name${num}-text`).textContent = name;
+  tag.style.display = 'flex';
+}
+
+function clearFile(num) {
+  if (num === 1) { wb1 = null; file1Name = ''; document.getElementById('file1').value = ''; }
+  else           { wb2 = null; file2Name = ''; document.getElementById('file2').value = ''; }
+  document.getElementById(`drop${num}`).style.display = 'block';
+  document.getElementById(`name${num}`).style.display = 'none';
+  checkReady();
+}
+
+function checkReady() {
+  document.getElementById('runBtn').disabled = !(wb1 && wb2);
+}
+
+// ── Normalize string: remove accents, uppercase ──
+function norm(s) {
+  if (!s) return '';
+  return s.toString().toUpperCase().trim()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// ── Format time: "09:13:01" → "09:13" ──
+function fmtTime(val) {
+  if (val === null || val === undefined || val === '') return null;
+  const s = String(val).trim();
+  if (!s || s === 'undefined' || s === 'null') return null;
+  const up = s.toUpperCase();
+  if (up.includes('INCIDENCIA') || up.includes('VACACION') || up.includes('APROBADO')) return 'INC';
+  // time string like "09:13:01" or "9:13:01"
+  const parts = s.split(':');
+  if (parts.length >= 2) {
+    const h = parts[0].padStart(2,'0');
+    const m = parts[1].padStart(2,'0');
+    return `${h}:${m}`;
+  }
+  return s;
+}
+
+function log(msg, cls='log-line') {
+  const box = document.getElementById('logBox');
+  box.classList.add('visible');
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function run() {
+  document.getElementById('logBox').innerHTML = '';
+  document.getElementById('logBox').classList.remove('visible');
+  document.getElementById('resultCard').classList.remove('visible');
+  resultWb = null;
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Procesando...';
+
+  setTimeout(() => {
+    try {
+      process();
+    } catch(err) {
+      log('ERROR: ' + err.message, 'err');
+      log(err.stack, 'err');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Procesar archivos';
+    checkReady();
+  }, 50);
+}
+
+function process() {
+  log('▸ Leyendo reporte de accesos...', 'head');
+
+  // ── Read Report sheet ──
+  const reportSheet = wb2.Sheets['Reporte'];
+  if (!reportSheet) throw new Error('No se encontró la hoja "Reporte" en el archivo de accesos.');
+
+  const reportRaw = XLSX.utils.sheet_to_json(reportSheet, { header: 1, raw: false, defval: '' });
+
+  // Row index 4 (0-based) has headers: NOMBRE, AP1, AP2, DESCRIPCION, dates...
+  const headerRow = reportRaw[4];
+  const dateCols = {}; // day_num -> col_index (from col 4 onward)
+  for (let c = 4; c < headerRow.length; c++) {
+    const dStr = headerRow[c];
+    if (!dStr) continue;
+    // format DD/MM/YYYY
+    const match = dStr.match(/^(\d{1,2})\/(\d{2})\/(\d{4})$/);
+    if (match) {
+      const day = parseInt(match[1]);
+      dateCols[day] = c;
+    }
+  }
+  log(`  Fechas encontradas en reporte: ${Object.keys(dateCols).join(', ')}`, 'ok');
+
+  // Build lookup: normalized_name -> {day -> {entrada, salida}}
+  const reportData = {};
+  for (let i = 5; i < reportRaw.length; i++) {
+    const row = reportRaw[i];
+    const nombre = row[0], ap1 = row[1], ap2 = row[2], desc = row[3];
+    if (!ap1 || desc !== 'Entrada') continue;
+
+    const key = ap2 ? norm(`${ap1} ${ap2} ${nombre}`) : norm(`${ap1} ${nombre}`);
+    const dayMap = {};
+    const salidaRow = reportRaw[i+1] || [];
+
+    for (const [dayStr, colIdx] of Object.entries(dateCols)) {
+      const day = parseInt(dayStr);
+      dayMap[day] = { entrada: row[colIdx] || '', salida: salidaRow[colIdx] || '' };
+    }
+    reportData[key] = dayMap;
+    i++; // skip salida row (handled above) — but we still need diferencia row
+    // actually skip diferencia row too
+    i++;
+  }
+
+  log(`  Trabajadores en reporte: ${Object.keys(reportData).length}`, 'ok');
+
+  // Alias for partial name match
+  const lnm = norm('LARA MURILLO NOEMI YURITZI');
+  if (reportData[lnm]) reportData[norm('LARA MURILLO NOEMI')] = reportData[lnm];
+
+  // ── Day → entry column index in ASISTENCIA (0-based pandas-style → xlsx col letter) ──
+  // Row 2 (idx 1): NOMBRE=col0, then pairs: day3→col1+2, day4→col3+4, etc.
+  const dayToEntryCol = {
+    3:1, 4:3, 5:5, 6:7, 9:9, 10:11, 11:13, 12:15, 13:17,
+    16:19, 17:21, 18:23, 19:25, 20:27, 23:29, 24:31, 25:33, 26:35, 27:37
+  };
+  const reportDays = Object.keys(dateCols).map(Number);
+
+  log('', 'log-line');
+  log('▸ Procesando hojas de asistencia...', 'head');
+
+  const SHEETS = ['UAPS - BIENES ASEGURADOS','SANCIONES','PROCESOS','TRADICIONAL','NUCLEO - A','NUCELO B'];
+  let totalFilled = 0, totalWorkers = 0, missing = [];
+
+  // Clone wb1 for output
+  resultWb = XLSX.utils.book_new();
+
+  for (const sheetName of wb1.SheetNames) {
+    const ws = wb1.Sheets[sheetName];
+    const wsClone = JSON.parse(JSON.stringify(ws)); // deep clone
+
+    if (!SHEETS.includes(sheetName)) {
+      XLSX.utils.book_append_sheet(resultWb, wsClone, sheetName);
+      continue;
+    }
+
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: null });
+
+    for (let r = 3; r < raw.length; r++) {
+      const workerName = raw[r][0];
+      if (!workerName || String(workerName).trim() === '') continue;
+
+      const key = norm(String(workerName));
+      if (!reportData[key]) {
+        missing.push(String(workerName).trim());
+        log(`  ⚠ No encontrado: ${workerName}`, 'warn');
+        continue;
+      }
+
+      totalWorkers++;
+      const workerDays = reportData[key];
+
+      for (const day of reportDays) {
+        if (!(day in workerDays) || !(day in dayToEntryCol)) continue;
+        const { entrada, salida } = workerDays[day];
+        const eColIdx = dayToEntryCol[day]; // 0-based
+        const sColIdx = eColIdx + 1;
+
+        // Convert 0-based col index to Excel col letter
+        const eCellRef = XLSX.utils.encode_cell({ r, c: eColIdx });
+        const sCellRef = XLSX.utils.encode_cell({ r, c: sColIdx });
+
+        const writeCell = (cellRef, val) => {
+          const fmt = fmtTime(val);
+          if (!fmt) return 0;
+          const existing = wsClone[cellRef];
+          if (!existing || existing.v === null || existing.v === '' || existing.v === undefined) {
+            wsClone[cellRef] = { t: 's', v: fmt };
+            return 1;
+          }
+          return 0;
+        };
+
+        totalFilled += writeCell(eCellRef, entrada);
+        totalFilled += writeCell(sCellRef, salida);
+      }
+    }
+
+    XLSX.utils.book_append_sheet(resultWb, wsClone, sheetName);
+    log(`  ✓ ${sheetName}`, 'ok');
+  }
+
+  log('', 'log-line');
+  log(`▸ Completado: ${totalFilled} celdas llenadas`, 'ok');
+
+  // Show results
+  document.getElementById('statFilled').textContent = totalFilled;
+  document.getElementById('statWorkers').textContent = totalWorkers;
+  document.getElementById('statMissing').textContent = [...new Set(missing)].length;
+  document.getElementById('resultCard').classList.add('visible');
+
+  document.getElementById('dlBtn').onclick = () => {
+    const outName = file1Name.replace(/\.xlsx?$/i, '') + '_LLENADO.xlsx';
+    XLSX.writeFile(resultWb, outName);
+  };
+}
+</script>
+</body>
+</html>
